@@ -1,0 +1,8 @@
+scikit-learn
+pandas
+tqdm
+evaluate
+datasets
+transformers
+accelerate
+tensorboard
