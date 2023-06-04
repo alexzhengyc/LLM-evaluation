@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 torch.cuda.empty_cache()
 
 # model and tokenizer
-model_name = "OpenAssistant/reward-model-deberta-v3-large-v2"
+model_name = "/root/LLM-evaluation/reward-model-deberta-v3-base"
 model, tokenizer = AutoModelForSequenceClassification.from_pretrained(model_name), AutoTokenizer.from_pretrained(model_name)
 # question, answer = "Explain nuclear fusion like I am five", "Nuclear fusion is the process by which two or more protons and neutrons combine to form a single nucleus. It is a very important process in the universe, as it is the source of energy for stars and galaxies. Nuclear fusion is also a key process in the production of energy for nuclear power plants."
 # inputs = tokenizer(question, answer, return_tensors='pt')
@@ -58,9 +58,11 @@ progress_bar = tqdm(range(num_training_steps))
 writer = SummaryWriter()
 
 
-# Training
+# Training and Evaluating
 model.train()
+
 for epoch in range(num_epochs):
+    # Training
     for i, batch in enumerate(train_dataloader):
         batch = {k: v.to(device) for k, v in batch.items()}
         outputs = model(**batch)
@@ -76,20 +78,26 @@ for epoch in range(num_epochs):
         if i % 50 == 0:  # every 50 batch
             writer.add_scalar('Loss/train', loss, epoch*len(train_dataloader)+i)
 
-# Evaluating
-metric = evaluate.load("accuracy")
-model.eval()
-for batch in eval_dataloader:
-    batch = {k: v.to(device) for k, v in batch.items()}
-    with torch.no_grad():
-        outputs = model(**batch)
+    # Evaluation
+    metric = evaluate.load("accuracy")
+    model.eval()
 
-    logits = outputs.logits
-    predictions = torch.argmax(logits, dim=-1)
-    metric.add_batch(predictions=predictions, references=batch["labels"])
+    for i, batch in enumerate(eval_dataloader):
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
 
-    # Write accuracy to TensorBoard
-    if i % 50 == 0:  # every 50 batch
-        writer.add_scalar('Accuracy/val', metric.compute(), epoch*len(eval_dataloader)+i)
+        logits = outputs.logits
+        predictions = torch.argmax(logits, dim=-1)
+        metric.add_batch(predictions=predictions, references=batch["labels"])
+
+        # Write accuracy to TensorBoard
+        if i % 50 == 0:  # every 50 batch
+            writer.add_scalar('Accuracy/val', metric.compute(), epoch*len(eval_dataloader)+i)
+
+    # Switch back to training mode
+    model.train()
+
+writer.close()
 
 writer.close()

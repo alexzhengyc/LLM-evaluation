@@ -5,4 +5,5 @@ evaluate
 datasets
 transformers
 accelerate
+tensorflow==2.8
 tensorboard
